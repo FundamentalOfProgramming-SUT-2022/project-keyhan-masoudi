@@ -9,59 +9,46 @@
 #include <string.h>
 
 ////////////////
-#define maxsize 5000
+#define maxsize 1000000
 #define clip_add "\\root\\dir1\\clipboard.txt"
+#define undo_save_add "\\cmake-build-debug\\undo_savefile.txt"
+#define nist "File doesnt exist"
+#define hast "File exist"
 ////////////////
 ////////////////
 unsigned long long int length_of_string;
-char path[100] , *func_name, check_name[20] , dirname[50], space , attribute ;
-char *script , *buffer , *buffer1 , *clipboard;
-int pos_line , pos_char , num , counter_of_enter , invalid_ckeck = 0;
+char path[100] , *func_name, dirname[50], space , attribute ;
+char *script , *buffer , *buffer1 , *clipboard ,*check_name;
+int pos_line , pos_char , num , counter_of_enter , invalid_check = 0 , flag_exist = 0;
 ////////////////
-void create_file (char address[]) {
-    address[strlen(address) + 1] = '\0';
-    int counter = 0;
-    for (int i = 0; address[i] != '\0'; ++i) {
-        if(address[i] == '\\')
-            counter++;
+int file_exist(char address[]){
+    if(access((address+1),F_OK) == 0){
+        return 1;
+    } else{
+        return 0;
     }
-    int counter1 = 0;
-    for (int i = 0; address[i] != '\0'; ++i) {
-        if(address[i] == '\\'){
-            counter1++;
-            if(counter == counter1)
-                break;
-            int j = i;
-            dirname[j] = address[j];
-            j++;
-            for (; address[j] != '\\'; ++j) {
-                dirname[j] = address[j];
-                dirname[j+1] = '\0';
-            }
-            int x = mkdir(dirname+1);
-            if(x == 0)
-                i = j-1;
-        }
-    }
-    FILE *newfile;
-    newfile = fopen(address + 1, "w");
-    fclose(newfile);
 }
 ////////////////
 char *readfile(char address[]){
-    buffer = (char*) calloc(maxsize, sizeof (char));
-    char c;
-    FILE *ptr;
-    ptr = NULL;
-    ptr = fopen(address + 1, "r");
-    for (int m = 0; (c=(fgetc(ptr))) != EOF; m++) {
-        buffer[m] = c;
+    if(!(file_exist(address))){
+        printf("%s",nist);
+        flag_exist = 1;
+        return NULL;
+    } else{
+        buffer = (char*) calloc(maxsize, sizeof (char));
+        char c;
+        FILE *ptr;
+        ptr = NULL;
+        ptr = fopen(address + 1, "r");
+        for (int m = 0; (c=(fgetc(ptr))) != EOF; m++) {
+            buffer[m] = c;
+        }
+        fclose(ptr);
+        return buffer;
     }
-    fclose(ptr);
-    return buffer;
 }
 ////////////////
-char * hidden_read(char address[]){
+char *hidden_read(char address[]){
     buffer = (char*) calloc(maxsize, sizeof (char));
     char c;
     FILE *ptr;
@@ -112,10 +99,110 @@ void writefile(char address[], char* matn){
     fclose(ptr);
 }
 ////////////////
+void writefile1(char address[], char* matn) {
+    FILE *ptr;
+    ptr = NULL;
+    ptr = fopen(address + 1, "w");
+    for (int i = 0;matn[i] != '\0'; ++i) {
+        fprintf(ptr,"%c",matn[i]);
+    }
+    fclose(ptr);
+}
+////////////////
 void hidden_write(char address[],char *matn){
     SetFileAttributesA(clip_add+1,32);
-    writefile(clip_add,matn);
+    writefile1(clip_add,matn);
     SetFileAttributesA(clip_add+1,32+FILE_ATTRIBUTE_HIDDEN);
+}
+///////////////
+char *inputstr(void){
+    char * inputs , c , b_slash;
+    inputs = (char*) calloc(maxsize, sizeof(char));
+    int i = 0;
+        c = getchar();
+        if(c == '"'){
+            c = 'z';
+            while (1){
+                c = getchar();
+                if((c == '"') && (b_slash == '\\')){
+                    inputs[i] = c;
+                    i++;
+                    b_slash = 'k';
+                } else if(c == '\\') {
+                    b_slash = c;
+                } else if((c == '"') && (b_slash != '\\')){
+                    break;
+                }
+                else{
+                    inputs[i] = c;
+                    i++;
+                }
+            }
+        } else{
+            inputs[i] = c;
+            i++;
+            while (1){
+                c = getchar();
+                if(c == ' ' || c == '\n'){
+                    break;
+                } else {
+                    inputs[i] = c;
+                    i++;
+                }
+            }
+        }
+    printf("%s",inputs);
+    return inputs;
+}
+///////////////
+void undo_save (char *matn){
+    FILE *pointer;
+    pointer = NULL;
+    pointer = fopen(undo_save_add+1,"w");
+    writefile1(undo_save_add,matn);
+    fclose(pointer);
+}
+///////////////
+void last_undo(char address[]){
+    char * undomatn;
+    undomatn = (char*) calloc(maxsize,sizeof(char ));
+    undomatn = readfile(undo_save_add);
+    writefile1(address,undomatn);
+}
+///////////////
+void create_file (char address[]) {
+    address[strlen(address) + 1] = '\0';
+    int counter = 0;
+    for (int i = 0; address[i] != '\0'; ++i) {
+        if(address[i] == '\\')
+            counter++;
+    }
+    int counter1 = 0;
+    for (int i = 0; address[i] != '\0'; ++i) {
+        if(address[i] == '\\'){
+            counter1++;
+            if(counter == counter1)
+                break;
+            int j = i;
+            dirname[j] = address[j];
+            j++;
+            for (; address[j] != '\\'; ++j) {
+                dirname[j] = address[j];
+                dirname[j+1] = '\0';
+            }
+            int x = mkdir(dirname+1);
+            if(x == 0)
+                i = j-1;
+        }
+    }
+    if(file_exist(address)){
+        printf("%s",hast);
+        return;
+    } else {
+        FILE *newfile;
+        newfile = fopen(address + 1, "w");
+        fclose(newfile);
+    }
 }
 ////////////////
 int enter(char matn[]){
@@ -128,47 +215,53 @@ int enter(char matn[]){
 }
 ////////////////
 void insert(char address[]){
+    free(check_name);
+    check_name = (char*) calloc(20 , sizeof(char));
     space = getchar();
     if(space != ' '){
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
     scanf("%s", check_name);
-    if(strcmp(check_name,"--pos")) {
-        invalid_ckeck = 1;
+    if((strcmp(check_name,"--pos"))) {
+        invalid_check = 1;
         return;
     }
     space = getchar();
     if(space != ' '){
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
     scanf("%d:%d",&pos_line,&pos_char);
     space = getchar();
     if(space != ' '){
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
+    free(check_name);
+    check_name = (char*) calloc(20 , sizeof(char));
     scanf("%s", check_name);
     if(strcmp(check_name,"--str")) {
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
     space = getchar();
     if(space != ' '){
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
-    /////////////////////
-    /////////////////////
     /////////////////////
     script = (char*) calloc(maxsize , sizeof(char));
     buffer = (char*) calloc(maxsize, sizeof (char));
     buffer1 = (char*) calloc(maxsize,sizeof (char));
     buffer = readfile(address);
+    undo_save(buffer);
+    if(buffer == NULL){
+        return;
+    }
     counter_of_enter = enter(buffer);
     if(pos_line > counter_of_enter+1){
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
     char c;
@@ -215,7 +308,7 @@ int check(char funcName[]){
     length_of_string = strlen(funcName);
     for (int i = 0; i < length_of_string; ++i) {
         if(funcName[i] == '-'){
-            invalid_ckeck = 1;
+            invalid_check = 1;
             return 0;
         }
     }
@@ -240,6 +333,9 @@ int check(char funcName[]){
     else if(!(strcmp(funcName, "pastestr"))){
         return 7;
     }
+    else if(!(strcmp(funcName, "undo"))){
+        return 8;
+    }
     else
         return -1;
 }
@@ -247,8 +343,12 @@ int check(char funcName[]){
 void cat(char address[]){
     script = (char*) calloc(maxsize , sizeof (char));
     script = readfile(address);
+    if(script == NULL){
+        return;
+    } else{
     for (int i = 0;script[i] != '\0'; ++i) {
-        printf("%c",script[i]);
+        printf("%c", script[i]);
+    }
     }
 }
 ////////////////
@@ -265,44 +365,50 @@ int  curser (int line , int p_char,char *matn){
 }
 ////////////////
 void removes(char address[]) {
-    buffer = (char *) calloc(maxsize, sizeof(char));
-    buffer = readfile(address);
     space = getchar();
     if (space != ' ') {
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
+    free(check_name);
+    check_name = (char*) calloc(20 , sizeof(char));
     scanf("%s", check_name);
     if (strcmp(check_name, "--pos") != 0) {
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
     space = getchar();
     if (space != ' ') {
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
     scanf("%d:%d", &pos_line, &pos_char);
     space = getchar();
     if (space != ' ') {
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
+    free(check_name);
+    check_name = (char*) calloc(20 , sizeof(char));
     scanf("%s%c", check_name, &space);
     if ((strcmp(check_name, "-size") != 0) || (space != ' ')) {
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
     char c;
     scanf("%d%c%c%c", &num, &space, &c, &attribute);
     if ((space != ' ') || (c != '-')) {
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
     int i = 0, j = 0;
     script = (char *) calloc(maxsize, sizeof(char));
     buffer = (char *) calloc(maxsize, sizeof(char));
     buffer = readfile(address);
+    undo_save(buffer);
+    if(buffer == NULL){
+        return;
+    }
     counter_of_enter = enter(buffer);
     length_of_string = strlen(buffer);
     int counter = 1;
@@ -336,38 +442,46 @@ void removes(char address[]) {
                 script[j] = buffer[j + num];
             }
         }
-    writefile(address,script);
+    writefile1(address,script);
         ///////////////////
 }
 ////////////////
 void copy(char address[]) {
     buffer = (char *) calloc(maxsize, sizeof(char));
     buffer = readfile(address);
+    if(buffer == NULL){
+        return;
+    }
     space = getchar();
+    free(check_name);
+    check_name = (char*) calloc(20 , sizeof(char));
     scanf("%s", check_name);
     if ((strcmp(check_name, "--pos") != 0) || (space != ' ')) {
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
     space = getchar();
     if (space != ' ') {
-        invalid_ckeck = 1;
+        invalid_check = 1;
+        return;
     }
     scanf("%d:%d", &pos_line, &pos_char);
     space = getchar();
     if (space != ' ') {
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
+    free(check_name);
+    check_name = (char*) calloc(20 , sizeof(char));
     scanf("%s%c", check_name, &space);
     if ((strcmp(check_name, "-size") != 0) || (space != ' ')) {
-        invalid_ckeck = 1;
+         invalid_check = 1;
         return;
     }
     char c;
     scanf("%d%c%c%c", &num, &space, &c, &attribute);
     if ((space != ' ') || (c != '-')) {
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
     clipboard = (char *) calloc(maxsize, sizeof(char));
@@ -378,11 +492,14 @@ void copy(char address[]) {
             clipboard[k] = buffer[i + k];
         }
     } else if (attribute == 'b') {
+        if(i < num){
+            i = num;
+        }
         for (int k = 0; k < num; ++k) {
-            clipboard[k] = buffer[i - num + k - 1];
+            clipboard[k] = buffer[i - num + k];
         }
     } else {
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
     hidden_write(clip_add,clipboard);
@@ -392,31 +509,40 @@ void cut (char address[]){
     buffer = (char *) calloc(maxsize, sizeof(char));
     script = (char *) calloc(maxsize,sizeof(char));
     buffer = readfile(address);
+    if(buffer == NULL){
+        return;
+    }
+    undo_save(buffer);
     space = getchar();
+    free(check_name);
+    check_name = (char*) calloc(20 , sizeof(char));
     scanf("%s", check_name);
     if ((strcmp(check_name, "--pos") != 0) || (space != ' ')) {
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
     space = getchar();
     if (space != ' ') {
-        invalid_ckeck = 1;
+        invalid_check = 1;
+        return;
     }
     scanf("%d:%d", &pos_line, &pos_char);
     space = getchar();
     if (space != ' ') {
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
+    free(check_name);
+    check_name = (char*) calloc(20 , sizeof(char));
     scanf("%s%c", check_name, &space);
     if ((strcmp(check_name, "-size") != 0) || (space != ' ')) {
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
     char c;
     scanf("%d%c%c%c", &num, &space, &c, &attribute);
     if ((space != ' ') || (c != '-')) {
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
     clipboard = (char *) calloc(maxsize, sizeof(char));
@@ -431,14 +557,17 @@ void cut (char address[]){
             clipboard[k] = buffer[i + k];
         }
     } else if (attribute == 'b') {
+        if(i < num){
+            i = num;
+        }
         for (int k = 0; k < num; ++k) {
-            clipboard[k] = buffer[i - num + k - 1];
+            clipboard[k] = buffer[i - num + k];
         }
     } else {
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
-    writefile(address,script);
+    writefile1(address,script);
     hidden_write(clip_add,clipboard);
 }
 ////////////////
@@ -447,15 +576,19 @@ void paste(char address[]){
     script = (char *) calloc(maxsize,sizeof(char));
     buffer1 = (char *) calloc(maxsize,sizeof(char));
     clipboard = readfile(address);
+    undo_save(clipboard);
     space = getchar();
+    free(check_name);
+    check_name = (char*) calloc(20 , sizeof(char));
     scanf("%s", check_name);
     if ((strcmp(check_name, "--pos") != 0) || (space != ' ')) {
-        invalid_ckeck = 1;
+        invalid_check = 1;
         return;
     }
     space = getchar();
     if (space != ' ') {
-        invalid_ckeck = 1;
+        invalid_check = 1;
+        return;
     }
     scanf("%d:%d", &pos_line, &pos_char);
     int i;
@@ -464,85 +597,115 @@ void paste(char address[]){
     buffer1 = hidden_read(clip_add);
     strcat(script,buffer1);
     strcat(script,clipboard+i+1);
-    writefile(address,script);
+    writefile1(address,script);
 }
+////////////////
+
 ////////////////
 int main(){
     int checkname;
     int flag = 1;
-//    int i;
-//    buffer = (char*) calloc(maxsize, sizeof (char));
-//    buffer = readfile("\\root\\dir1\\file1.txt");
-//    i = curser(1,7,buffer);
-//    printf("%d",i);
+    invalid_check = 0;
     while(flag){
+            if (invalid_check /*&&!(flag_exist)*/) {
+                printf("INVALID COMMAND");
+                invalid_check = 0;
+                continue;
+            }
         func_name = (char*) calloc(maxsize, sizeof(char));
         scanf("%s",func_name);
         space = getchar();
         if(space != ' '){
-            invalid_ckeck = 1;
-            continue;
+            invalid_check = 1;
         }
+        free(check_name);
+        check_name = (char*) calloc(20 , sizeof(char));
         scanf("%s", check_name);
         space = getchar();
         if(strcmp(check_name,"--file") != 0){
-            invalid_ckeck = 1;
-            continue;
+            invalid_check = 1;
         }
         if(space != ' '){
-            invalid_ckeck = 1;
-            continue;
+            invalid_check = 1;
         }
         checkname = check(func_name);
         scanf("%s",path);
         if(checkname == 1) {
-            create_file(path);
-            if (invalid_ckeck) {
+            if (invalid_check == 1) {
                 printf("INVALID COMMAND");
-                invalid_ckeck = 0;
+                invalid_check = 0;
+            } else {
+                create_file(path);
             }
         }
         else if(checkname == 2){
-            insert(path);
-            if (invalid_ckeck) {
+            if (invalid_check == 1) {
                 printf("INVALID COMMAND");
-                invalid_ckeck = 0;
+                invalid_check = 0;
+            } else {
+                insert(path);
             }
         }
         else if(checkname == 3){
-            cat(path);
-            if (invalid_ckeck) {
+            if (invalid_check == 1) {
                 printf("INVALID COMMAND");
-                invalid_ckeck = 0;
+                invalid_check = 0;
+            } else {
+                cat(path);
             }
         }
         else if(checkname == 4){
-            removes(path);
-            if (invalid_ckeck) {
+            if (invalid_check == 1) {
                 printf("INVALID COMMAND");
-                invalid_ckeck = 0;
+                invalid_check = 0;
+            } else {
+                removes(path);
             }
         }else if(checkname == 5){
-            copy(path);
-            if (invalid_ckeck) {
+            if (invalid_check == 1) {
                 printf("INVALID COMMAND");
-                invalid_ckeck = 0;
+                invalid_check = 0;
+            } else {
+                copy(path);
             }
         }else if(checkname == 6){
-            cut(path);
-            if (invalid_ckeck) {
+            if (invalid_check == 1) {
                 printf("INVALID COMMAND");
-                invalid_ckeck = 0;
+                invalid_check = 0;
+            } else {
+                cut(path);
             }
-        }else if(checkname == 7){
-            paste(path);
-            if (invalid_ckeck) {
+        }else if(checkname == 7) {
+            if (invalid_check == 1) {
                 printf("INVALID COMMAND");
-                invalid_ckeck = 0;
+                invalid_check = 0;
+            } else {
+                paste(path);
+            }
+        }else if(checkname == 8) {
+            if (invalid_check == 1) {
+                printf("INVALID COMMAND");
+                invalid_check = 0;
+            } else {
+                last_undo(path);
             }
         }
+//        }else if(checkname == 8){
+//            find(path);
+//            if (// invalid_check = 1;) {
+//                printf("INVALID COMMAND");
+//                invalid_check = 0;
+//            }
+//        }
+        //flag  = 0;
     }
-    return 0 ;
 }
+
+
+
+
+
+
+
 /*\root\dir1\file.txt
 createfile --file \root\dir1\file.txt*/
