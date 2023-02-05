@@ -19,7 +19,7 @@
 unsigned long long int length_of_string;
 char path[100] , *func_name, dirname[50], space , attribute ;
 char *script , *buffer , *buffer1 , *clipboard ,*check_name;
-int pos_line , pos_char , num , counter_of_enter , invalid_check = 0 , flag_exist = 0;
+int pos_line , pos_char , num , counter_of_enter , invalid_check = 0 , flag_exist = 0 , flag_find = 0 , count = 0,at = 0,byword = 0;
 ////////////////
 int file_exist(char address[]){
     if(access((address+1),F_OK) == 0){
@@ -63,42 +63,6 @@ char *hidden_read(char address[]){
     return buffer;
 }
 ////////////////
-void writefile(char address[], char* matn){
-    FILE *ptr;
-    ptr = NULL;
-    ptr = fopen(address + 1, "w");
-    for (int i = 0;matn[i] != '\0'; ++i) {
-        if (matn[i] == '\\' && matn[i - 1] != '\\') {
-            if (matn[i + 1] == 'n') {
-                fprintf(ptr, "%c", '\n');
-                i++;
-                continue;
-            }
-            else if (matn[i+1] == 't') {
-                fprintf(ptr, "%c", '\t');
-                i++;
-                continue;
-            }
-            else if(matn[i+1] == '\\') {
-                continue;
-            }
-            else{
-                fprintf(ptr,"%c",matn[i]);
-                continue;
-            }
-        }
-        else if(matn[i] =='\\' && matn[i-1] == '\\'){
-            fprintf(ptr,"%c",matn[i]);
-            continue;
-        }
-        else {
-            fprintf(ptr, "%c", matn[i]);
-            continue;
-        }
-    }
-    fclose(ptr);
-}
-////////////////
 void writefile1(char address[], char* matn) {
     FILE *ptr;
     ptr = NULL;
@@ -114,26 +78,57 @@ void hidden_write(char address[],char *matn){
     writefile1(clip_add,matn);
     SetFileAttributesA(clip_add+1,32+FILE_ATTRIBUTE_HIDDEN);
 }
-///////////////
+////////////////
 char *inputstr(void){
-    char * inputs , c , b_slash;
+    char *inputs , c , b_slash;
     inputs = (char*) calloc(maxsize, sizeof(char));
     int i = 0;
         c = getchar();
         if(c == '"'){
             c = 'z';
             while (1){
-                c = getchar();
-                if((c == '"') && (b_slash == '\\')){
-                    inputs[i] = c;
-                    i++;
-                    b_slash = 'k';
-                } else if(c == '\\') {
-                    b_slash = c;
-                } else if((c == '"') && (b_slash != '\\')){
-                    break;
+                c = getchar();                                          /*ide gerefte as (sahand esmaiel zade)*/
+                if(inputs[i-1] != '\\' && c == '"'){
+                    c = getchar();
+                    if(c == '\n') {
+                        flag_find = 0;
+                        break;
+                    } else {
+                        flag_find = 1;
+                        break;
+                    }
                 }
-                else{
+                if(c == '\\'){
+                    c = getchar();
+                    b_slash = c;
+                    if(b_slash == '\\'){
+                        inputs[i] = '\\';
+                        i++;
+                        do {
+                            c = getchar();
+                            if(c == '"'){
+                                if(inputs[i-1] != '\\'){
+                                    c = getchar();
+                                    if(c == '\n') {
+                                        flag_find = 0;
+                                        return inputs;
+                                    } else {
+                                        flag_find = 1;
+                                        return inputs;
+                                    }
+                                }
+                            }
+                            inputs[i] = c;
+                            i++;
+                        } while (c != ' ' && c != '\0');
+                    } else if(b_slash == 'n'){
+                        inputs[i] = '\n';
+                        i++;
+                    } else if (b_slash == '"'){
+                        inputs[i] = '"';
+                        i++;
+                    }
+                } else{
                     inputs[i] = c;
                     i++;
                 }
@@ -143,15 +138,19 @@ char *inputstr(void){
             i++;
             while (1){
                 c = getchar();
-                if(c == ' ' || c == '\n'){
+                if(c == '\n'){
+                    flag_find = 0;
                     break;
-                } else {
+                } else if(c == ' '){
+                    flag_find = 1;
+                    break;
+                }
+                else {
                     inputs[i] = c;
                     i++;
                 }
             }
         }
-    printf("%s",inputs);
     return inputs;
 }
 ///////////////
@@ -196,6 +195,7 @@ void create_file (char address[]) {
         }
     }
     if(file_exist(address)){
+        flag_exist = 1;
         printf("%s",hast);
         return;
     } else {
@@ -298,10 +298,10 @@ void insert(char address[]){
     }
     strncpy(buffer1,buffer+j+1,countofrest);
     buffer = (char*) calloc(maxsize,sizeof (char));
-    scanf("%[^\n]s",buffer);
+    buffer = inputstr();
     strcat(script,buffer);
     strcat(script,buffer1);
-    writefile(address, script);
+    writefile1(address, script);
 }
 ////////////////
 int check(char funcName[]){
@@ -335,6 +335,9 @@ int check(char funcName[]){
     }
     else if(!(strcmp(funcName, "undo"))){
         return 8;
+    }
+    else if(!(strcmp(funcName, "find"))){
+        return 9;
     }
     else
         return -1;
@@ -600,14 +603,267 @@ void paste(char address[]){
     writefile1(address,script);
 }
 ////////////////
-
+int find_count(char address[],char *text) {
+    int counter = 0;
+    char *matn_file, *test;
+    int length = (int) strlen(text);
+    matn_file = (char *) calloc(maxsize, sizeof(char));
+    test = (char *) calloc(length + 1, sizeof(char));
+    matn_file = readfile(address);
+    /////////////////////////
+    length = (int) strlen(text);
+    int flag_wildcard = 0;
+    for (int i = 0; i < length; ++i) {
+        if (text[i] == '*' && text[i - 1] != '\\') {
+            flag_wildcard = 1;
+            break;
+        }
+    }
+    //////////////////////////////
+        if (flag_wildcard) {
+            int i;
+            test = (char *) calloc(length + 1, sizeof(char));
+            if (text[0] == '*') {
+                i = 0;
+                i++;
+                while (1) {
+                    if (text[i] == '\0') {
+                        break;
+                    }
+                    test[i - 1] = text[i];
+                    i++;
+                }
+                for (int k = 0; matn_file[k] != '\0' && matn_file[k] != EOF; ++k) {
+                    if (test[0] == matn_file[k]) {
+                        char *last;
+                        last = (char *) calloc(200, sizeof(char));
+                        strncpy(last, matn_file + k, (int) strlen(test));
+                        if (strcmp(last, test) == 0) {
+                            while (1) {
+                                if (matn_file[k] == ' ' || matn_file[k] == EOF || matn_file[k] == '\0' ||
+                                    matn_file[k] == '\n') {
+                                    counter++;
+                                } else {
+                                    k++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            //////////////////
+            length = (int) strlen(text);
+            if (text[length - 1] == '*') {
+                int finish;
+                i = length - 1;
+                while (1) {
+                    if (text[i] == '\0' || i == 0 || text[i] == EOF) {
+                        finish = i;
+                        break;
+                    } else {
+                        i--;
+                    }
+                }
+                strncpy(test, text + finish, (length - 1) - finish);
+                length = (int) strlen(test);
+                for (int k = 0; matn_file[k] != '\0' && matn_file[k] != EOF; ++k) {
+                    if (test[0] == matn_file[k]) {
+                        char *last;
+                        last = (char *) calloc(200, sizeof(char));
+                        strncpy(last, matn_file + k, (int) strlen(test));
+                        int m = k;
+                        if (strcmp(last, test) == 0) {
+                            while (1) {
+                                if (matn_file[m] == ' ' || matn_file[m] == EOF || matn_file[m] == '\0' || m == 0) {
+                                    counter++;
+                                    k = m;
+                                    break;
+                                } else {
+                                    m++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            for (int i = 0;matn_file[i] != EOF && matn_file[i] != '\0'; ++i) {
+            if (text[0] == matn_file[i]) {
+                test = (char *) calloc(length + 1, sizeof(char));
+                strncat(test, matn_file + i, length);
+                if (strcmp(test, text) == 0) {
+                    counter++;
+                }
+            } else {
+                continue;
+            }
+        }
+    }
+    return counter;
+}
 ////////////////
+void findstr(char address[]) {
+    space = getchar();
+    if (space != ' ') {
+        invalid_check = 1;
+        return;
+    }
+    free(check_name);
+    check_name = (char *) calloc(20, sizeof(char));
+    scanf("%s", check_name);
+    if (strcmp(check_name, "--str")) {
+        invalid_check = 1;
+        return;
+    }
+    space = getchar();
+    if (space != ' ') {
+        invalid_check = 1;
+        return;
+    }
+    char *txt, *matn_file, *test;
+    txt = (char *) calloc(maxsize, sizeof(char));
+    matn_file = (char *) calloc(maxsize, sizeof(char));
+    txt = inputstr();
+    if (flag_find == 0) {
+        int flag_wildcard = 0, j = 0;
+        matn_file = readfile(address);
+        int length = (int) strlen(txt);
+        for (int i = 0; i < length; ++i) {
+            if (txt[i] == '*' && txt[i - 1] != '\\') {
+                flag_wildcard = 1;
+                break;
+            }
+        }
+        //////////////////////////////
+        for (int i = 0; txt[i] != '\0' || txt[i] != EOF; ++i) {
+            if (flag_wildcard) {
+                test = (char *) calloc(length + 1, sizeof(char));
+                if (txt[0] == '*') {
+                    i = 0;
+                    i++;
+                    while (1) {
+                        if (txt[i] == '\0') {
+                            break;
+                        }
+                        test[i - 1] = txt[i];
+                        i++;
+                    }
+                    for (int k = 0; matn_file[k] != '\0' && matn_file[k] != EOF; ++k) {
+                        if (test[0] == matn_file[k]) {
+                            char *last;
+                            last = (char *) calloc(200, sizeof(char));
+                            strncpy(last, matn_file + k, (int) strlen(test));
+                            if (strcmp(last, test) == 0) {
+                                while (1) {
+                                    if (matn_file[k] == ' ' || matn_file[k] == EOF || matn_file[k] == '\0' || k < -1) {
+                                        printf("%d", k + 2);
+                                        return;
+                                    } else {
+                                        k--;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                //////////////////
+                length = (int) strlen(txt);
+                if (txt[length - 1] == '*') {
+                    int finish;
+                    i = length - 1;
+                    while (1) {
+                        if (txt[i] == '\0' || i == 0 || txt[i] == EOF) {
+                            finish = i;
+                            break;
+                        } else {
+                            i--;
+                        }
+                    }
+                    strncpy(test, txt + finish, (length - 1) - finish);
+                    length = (int) strlen(test);
+                    for (int k = 0; matn_file[k] != '\0' && matn_file[k] != EOF; ++k) {
+                        if (test[0] == matn_file[k]) {
+                            char *last;
+                            last = (char *) calloc(200, sizeof(char));
+                            strncpy(last, matn_file + k, (int) strlen(test));
+                            if (strcmp(last, test) == 0) {
+                                int start = k;
+                                while (1) {
+                                    if (matn_file[k] == ' ' || matn_file[k] == EOF || matn_file[k] == '\0' || k < -1) {
+                                        printf("%d", start+1);
+                                        return;
+                                    } else {
+                                        k++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                if (txt[0] == matn_file[i]) {
+                    test = (char *) calloc(length + 1, sizeof(char));
+                    strncat(test, matn_file + i, length);
+                    if (strcmp(test, txt) == 0) {
+                        printf("%d", i + 1);
+                        return;
+                    }
+                } else {
+                    continue;
+                }
+            }
+        }
+    }
+            int counter;
+                if (flag_find == 1) {
+                    char c;
+                    c = getchar();
+                    if (c != '-') {
+                        invalid_check = 1;
+                        return;
+                    }
+                    c = getchar();
+                    if (c == 'a') {
+                        int size_at;
+                        while (1) {
+                            c = getchar();
+                            if (c == ' ') {
+                                break;
+                            }
+                        }
+                        scanf("%d", &size_at);
+                        //callfunc
+                    } else if (c == 'b') {
+                        while (1) {
+                            c = getchar();
+                            if (c == '\n') {
+                                break;
+                            }
+                        }
+                        //callfunc
+                    } else if (c == 'c') {
+                        while (1) {
+                            c = getchar();
+                            if (c == '\n') {
+                                break;
+                            }
+                        }
+                       counter = find_count(address,txt);
+                        printf("%d",counter);
+                    } else {
+                        invalid_check = 1;
+                        return;
+                    }
+                }
+            }
+////////////////
+////////
 int main(){
     int checkname;
     int flag = 1;
     invalid_check = 0;
     while(flag){
-            if (invalid_check /*&&!(flag_exist)*/) {
+            if (invalid_check && (!flag_exist)) {
                 printf("INVALID COMMAND");
                 invalid_check = 0;
                 continue;
@@ -689,14 +945,14 @@ int main(){
             } else {
                 last_undo(path);
             }
+        }else if(checkname == 9) {
+            if (invalid_check == 1) {
+                printf("INVALID COMMAND");
+                invalid_check = 0;
+            } else {
+                findstr(path);
+            }
         }
-//        }else if(checkname == 8){
-//            find(path);
-//            if (// invalid_check = 1;) {
-//                printf("INVALID COMMAND");
-//                invalid_check = 0;
-//            }
-//        }
         //flag  = 0;
     }
 }
